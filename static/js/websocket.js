@@ -1,0 +1,518 @@
+const synth = window.speechSynthesis;
+let currentSpokenWord = "";
+let isReading = false;
+
+let ws;
+let reconnectDelay = 2000;
+let pingInterval;
+
+let audioUnlocked = false;
+let currentCategoryAbbrev = "GEN";
+let currentStageType = "TOSSUP";
+
+// --- ACTION TIMER LOGIC ---
+let actionTimerInterval = null;
+
+function startActionTimer(seconds, warningAt = null) {
+    if (actionTimerInterval) clearInterval(actionTimerInterval);
+
+    const display = document.getElementById('action-timer-display');
+    const bar = document.getElementById('action-timer-bar');
+    const warning = document.getElementById('action-timer-warning');
+    const box = document.getElementById('action-timer-box');
+
+    let remaining = seconds;
+    const total = seconds;
+
+    if (warning) warning.classList.add('hidden');
+    if (box) box.classList.remove('border-red-500', 'border-amber-500');
+    if (bar) {
+        bar.style.width = '100%';
+        bar.className = 'bg-teamA h-full transition-all duration-100';
+    }
+
+    actionTimerInterval = setInterval(() => {
+        remaining -= 0.1;
+
+        if (remaining <= 0) {
+            clearInterval(actionTimerInterval);
+            if (display) display.innerText = '0.0s';
+            if (bar) bar.style.width = '0%';
+            if (warning) warning.classList.add('hidden');
+            return;
+        }
+
+        if (display) display.innerText = remaining.toFixed(1) + 's';
+        if (bar) bar.style.width = `${(remaining / total) * 100}%`;
+
+        // 5-Second Warning Trigger
+        if (warningAt && remaining <= warningAt) {
+            if (warning) warning.classList.remove('hidden');
+            if (box) box.classList.add('border-red-500');
+            if (bar) bar.className = 'bg-red-500 h-full transition-all duration-100 animate-pulse';
+        }
+    }, 100);
+}
+
+function stopActionTimer() {
+    if (actionTimerInterval) clearInterval(actionTimerInterval);
+    const display = document.getElementById('action-timer-display');
+    const bar = document.getElementById('action-timer-bar');
+    const warning = document.getElementById('action-timer-warning');
+    const box = document.getElementById('action-timer-box');
+
+    if (display) display.innerText = '--';
+    if (bar) bar.style.width = '100%';
+    if (warning) warning.classList.add('hidden');
+    if (box) box.classList.remove('border-red-500');
+}
+
+// --- AUDIO UNLOCK HACK FOR BROWSERS ---
+document.addEventListener('click', () => {
+    if (!audioUnlocked) {
+        const u = new SpeechSynthesisUtterance('');
+        u.volume = 0;
+        synth.speak(u);
+        audioUnlocked = true;
+    }
+}, { once: true });
+
+// --- MAIN WEBSOCKET CONNECTION ---
+function connectWebSocket() {
+    ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+    ws.onopen = () => {
+        const statusEl = document.getElementById('header-status');
+        if (statusEl) statusEl.innerText = 'READY';
+        
+        reconnectDelay = 2000; 
+        
+        if (pingInterval) clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "PING", payload: {} }));
+            }
+        }, 15000);
+    };
+
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        const payload = data.payload || {};
+        const statusEl = document.getElementById('header-status');
+
+        if (data.type === 'UPDATE_STATUS') {
+            if (statusEl) statusEl.innerText = payload.text || 'READY';
+            
+            // EXACT TRIGGER: Start the 5-second physical timer only when the backend opens the buzz window
+            if (payload.text === "⏳ 5 Seconds to Buzz...") {
+                const label = document.getElementById('action-timer-label');
+                if (label) label.innerText = "TOSSUP (5s BUZZ)";
+                startActionTimer(5.0, null);
+            }
+        }
+        else if (data.type === 'UI_STATE') {
+            const btnTossup = document.getElementById('btn-start-tossup');
+            const btnBonus = document.getElementById('btn-start-bonus');
+            const btnReread = document.getElementById('btn-reread-tossup');
+            const overrideGrp = document.getElementById('override-controls');
+            
+            btnTossup?.classList.add('hidden');
+            btnBonus?.classList.add('hidden');
+            btnReread?.classList.add('hidden');
+            overrideGrp?.classList.add('hidden');
+            
+            if (payload.show === 'TOSSUP') btnTossup?.classList.remove('hidden');
+            if (payload.show === 'BONUS') btnBonus?.classList.remove('hidden');
+            if (payload.show === 'REREAD') btnReread?.classList.remove('hidden');
+            if (payload.overrides) overrideGrp?.classList.remove('hidden');
+        }
+        else if (data.type === 'UPDATE_QUESTION') {
+            currentStageType = "TOSSUP";
+            setStage('READ_TOSSUP'); 
+            
+            const catMap = {
+                "BIOLOGY": "BIO", 
+                "CHEMISTRY": "CHEM", 
+                "PHYSICS": "PHY",
+                "MATH": "MATH", 
+                "EARTH SCIENCE": "ESS", 
+                "ENERGY": "NRG",
+                "EARTH AND SPACE": "ESS", 
+                "GENERAL SCIENCE": "GEN"
+            };
+            const rawCat = (payload.category || 'GENERAL').toUpperCase();
+            currentCategoryAbbrev = catMap[rawCat] || rawCat.substring(0, 4);
+
+            const titleText = document.getElementById('stage-title-text');
+            const subText = document.getElementById('stage-subtitle-text');
+            const catBadge = document.getElementById('stage-cat-badge');
+            
+            if (catBadge) catBadge.innerText = payload.category || 'GENERAL';
+            if (titleText) titleText.innerText = "";
+            
+            if (subText) {
+                const safeAnswer = payload.answer ? String(payload.answer).trim() : "";
+                if (safeAnswer !== "") {
+                    subText.innerText = ``;
+                    subText.className = "text-lg text-emerald-400 font-bold font-sans mt-3";
+                } else {
+                    subText.innerText = `OFFICIAL ANSWER: [Not Provided]`;
+                    subText.className = "text-lg text-amber-500 font-bold font-sans mt-3";
+                }
+            }
+        } 
+        else if (data.type === 'NEW_LOG_ENTRY') {
+            const tbody = document.getElementById('scoresheet-body');
+            if (tbody) {
+                if (tbody.children.length === 1 && tbody.textContent.toLowerCase().includes("match data will populate here")) {
+                    tbody.innerHTML = "";
+                }
+
+                let isOverride = payload.Event_Type === 'MANUAL_OVERRIDE';
+                let tr = null;
+                
+                if (!isOverride) {
+                    tr = tbody.querySelector(`tr[data-qnum="${payload.Q_Num}"]`);
+                }
+                
+                if (!tr) {
+                    tr = document.createElement('tr');
+                    if (!isOverride) {
+                        tr.setAttribute('data-qnum', payload.Q_Num);
+                    }
+                    tr.className = "border-b border-isoborder/50 hover:bg-isodark/50 transition";
+                    
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 text-center ta-toss font-mono text-xs"></td>
+                        <td class="py-3 px-4 text-center ta-bonus font-mono text-xs"></td>
+                        <td class="py-2 px-2 text-center bg-isodark border-x border-isoborder min-w-[120px]">
+                            <div class="flex justify-center items-center space-x-2 mb-1">
+                                <span class="text-white font-bold text-xs q-label"></span>
+                                <span class="text-slate-400 font-bold text-[10px] q-cat"></span>
+                            </div>
+                            <div class="flex justify-center items-center space-x-4 text-sm font-black">
+                                <span class="text-teamA q-score-a"></span>
+                                <span class="text-teamB q-score-b"></span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 text-center tb-toss font-mono text-xs"></td>
+                        <td class="py-3 px-4 text-center tb-bonus font-mono text-xs"></td>
+                    `;
+                    tbody.prepend(tr);
+                }
+
+                tr.querySelector('.q-label').innerText = isOverride ? 'OVERRIDE' : 'Q' + payload.Q_Num;
+                if (!isOverride) {
+                    tr.querySelector('.q-cat').innerText = typeof currentCategoryAbbrev !== 'undefined' ? currentCategoryAbbrev : 'GEN';
+                }
+                tr.querySelector('.q-score-a').innerText = payload.Score_A;
+                tr.querySelector('.q-score-b').innerText = payload.Score_B;
+
+                if (payload.Event_Type === "DEAD_TOSSUP") return; 
+
+                const makeEditable = (cell, colName) => {
+                    cell.title = "Double-click to edit";
+                    cell.classList.add('cursor-pointer', 'hover:bg-isoborder');
+                    
+                    cell.ondblclick = () => {
+                        // Strip the " *" indicator if it exists so the input box is clean
+                        const currentText = cell.innerText.replace(' *', '').trim();
+                        
+                        cell.innerHTML = `<input type="text" class="w-full bg-isodark text-white font-mono text-center border border-teamA py-1 focus:outline-none" value="${currentText}">`;
+                        const input = cell.querySelector('input');
+                        input.focus();
+                        
+                        const saveEdit = () => {
+                            const newVal = input.value.trim();
+                            // Optimistic UI update: instantly show the new value with the edit indicator
+                            cell.innerText = newVal + " *";
+                            
+                            sendEvent('EDIT_LOG_ENTRY', {
+                                q_num: payload.Q_Num,
+                                team: payload.Team,
+                                column: colName, // Sends "TOSSUP" or "BONUS"
+                                new_val: newVal
+                            });
+                        };
+                        
+                        input.onblur = saveEdit;
+                        input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
+                    };
+                };
+
+                const setTossup = (selector, points, player, teamColorClass) => {
+                    const cell = tr.querySelector(selector);
+                    cell.classList.remove('text-teamA', 'text-teamB', 'text-red-400', 'text-zinc-500', 'text-emerald-400');
+                    
+                    if (points > 0) {
+                        cell.innerText = `${player} +${points}`;
+                        cell.classList.add(teamColorClass, 'font-bold');
+                    } else if (points < 0) {
+                        cell.innerText = `${player} ${points}`;
+                        cell.classList.add('text-red-400', 'font-bold');
+                    } else {
+                        cell.innerText = `${player} X`;
+                        cell.classList.add('text-zinc-500', 'font-bold');
+                    }
+                    if (payload.Edited) cell.innerText += " *"; // Indicator for edited
+                    makeEditable(cell, 'TOSSUP');
+                };
+
+                const setBonus = (selector, points) => {
+                    const cell = tr.querySelector(selector);
+                    cell.classList.remove('text-teamA', 'text-teamB', 'text-red-400', 'text-zinc-500', 'text-emerald-400');
+                    
+                    // Explicitly handle 10 points (correct) or 0 points (incorrect/dead)
+                    if (points === 10) {
+                        cell.innerText = "10";
+                        cell.classList.add('text-emerald-400', 'font-bold');
+                    } else {
+                        cell.innerText = "0";
+                        cell.classList.add('text-zinc-500', 'font-bold');
+                    }
+                    
+                    if (payload.Edited) cell.innerText += " *"; 
+                    
+                    // Pass 'BONUS' exactly to tell the backend which phase to edit
+                    makeEditable(cell, 'BONUS');
+                };
+
+                if (payload.Team === "Team A") {
+                    if (payload.Event_Type.includes("TOSSUP")) {
+                        setTossup('.ta-toss', payload.Points, payload.Player, 'text-teamA');
+                    } else if (payload.Event_Type === "BONUS") {
+                        setBonus('.ta-bonus', payload.Points);
+                    } else if (isOverride) {
+                        tr.querySelector('.ta-toss').innerText = "🔧";
+                        setBonus('.ta-bonus', payload.Points);
+                    }
+                } 
+                else if (payload.Team === "Team B") {
+                    if (payload.Event_Type.includes("TOSSUP")) {
+                        setTossup('.tb-toss', payload.Points, payload.Player, 'text-teamB');
+                    } else if (payload.Event_Type === "BONUS") {
+                        setBonus('.tb-bonus', payload.Points);
+                    } else if (isOverride) {
+                        tr.querySelector('.tb-toss').innerText = "🔧";
+                        setBonus('.tb-bonus', payload.Points);
+                    }
+                }
+            }
+        }
+        else if (data.type === 'START_READING') {
+            speakText(payload.text);
+        }
+        else if (data.type === 'START_LISTENING') {
+            const timeout = payload.timeout || 5.0;
+            
+            if (timeout > 15.0) {
+                currentStageType = "BONUS";
+                const label = document.getElementById('action-timer-label');
+                if (label) label.innerText = "BONUS CONFER (20s)";
+                startActionTimer(20.0, 5.0);
+            } else {
+                const label = document.getElementById('action-timer-label');
+                if (label) label.innerText = "ANSWERING";
+                startActionTimer(timeout, 2.0);
+            }
+            
+            startListening(timeout, payload.expires_at || null);
+        }
+        else if (data.type === 'DEBUG_FRAME') {
+            const img = new Image();
+            img.onload = () => {
+                const matchCanvas = document.getElementById('match-calib-canvas');
+                if (matchCanvas && matchCanvas.offsetParent !== null) {
+                    matchCanvas.width = img.width;
+                    matchCanvas.height = img.height;
+                    const ctx = matchCanvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                }
+            };
+            img.src = payload.frame_data;
+        }
+        else if (data.type === 'UI_STATE') {
+            const btnTossup = document.getElementById('btn-start-tossup');
+            const btnBonus = document.getElementById('btn-start-bonus');
+            
+            if (btnTossup && btnBonus) {
+                if (payload.show === 'TOSSUP') {
+                    btnTossup.classList.remove('hidden');
+                    btnBonus.classList.add('hidden');
+                } else if (payload.show === 'BONUS') {
+                    btnTossup.classList.add('hidden');
+                    btnBonus.classList.remove('hidden');
+                } else {
+                    btnTossup.classList.add('hidden');
+                    btnBonus.classList.add('hidden');
+                }
+            }
+        }
+        else if (data.type === 'UPDATE_SCORE') {
+            const scoreA = document.getElementById('score-header-a');
+            const scoreB = document.getElementById('score-header-b');
+            if (scoreA && payload.score_a !== undefined) scoreA.innerText = payload.score_a;
+            if (scoreB && payload.score_b !== undefined) scoreB.innerText = payload.score_b;
+        }
+        else if (data.type === 'BUZZ') {
+            stopActionTimer(); 
+            if (isReading) {
+                synth.cancel();
+                isReading = false;
+                sendEvent('LOG_BUZZPOINT', { buzzpoint: currentSpokenWord });
+            }
+            
+            setStage('BUZZ');
+            const team = payload.team || 'Unknown';
+            const player = payload.player || 'Player';
+            
+            const playerEl = document.getElementById('buzz-player-name');
+            if (playerEl) playerEl.innerText = `FLOOR: ${team} (${player})`;
+            
+            document.body.style.backgroundColor = '#450a0a';
+            setTimeout(() => document.body.style.backgroundColor = '#121214', 300);
+        }
+    };
+
+    ws.onerror = (err) => {
+        console.warn("WebSocket Error, closing to trigger reconnect...", err);
+        ws.close();
+    };
+
+    ws.onclose = () => { 
+        const statusEl = document.getElementById('header-status');
+        if (statusEl) statusEl.innerText = 'DISCONNECTED - RECONNECTING...'; 
+        
+        if (pingInterval) clearInterval(pingInterval);
+        
+        setTimeout(connectWebSocket, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
+    };
+}
+
+connectWebSocket();
+
+function sendEvent(eventType, payload = {}) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: eventType, payload: payload }));
+    } else {
+        console.warn(`Cannot send event ${eventType}: WebSocket is not open.`);
+    }
+}
+
+// --- TEXT TO SPEECH (TTS) LOGIC ---
+function speakText(text) {
+    try {
+        if (window._activeUtterance) {
+            window._activeUtterance.onend = null;
+            window._activeUtterance.onerror = null;
+        }
+        
+        synth.cancel(); 
+        
+        if (!text || text.trim() === "") {
+            sendEvent('READING_DONE', {});
+            return;
+        }
+
+        setTimeout(() => {
+            const utterance = new SpeechSynthesisUtterance(text);
+            window._activeUtterance = utterance; 
+            
+            utterance.rate = 1.1; 
+            isReading = true;
+            
+            utterance.onboundary = (event) => {
+                if (event.name === 'word') {
+                    const wordStr = text.substring(event.charIndex);
+                    currentSpokenWord = wordStr.split(/[ \n\r\t]+/, 1)[0].replace(/[^a-zA-Z0-9-]/g, '');
+                    const statusEl = document.getElementById('header-status');
+                    if (statusEl) statusEl.innerText = `🗣️ ...${currentSpokenWord}`;
+                }
+            };
+            
+            utterance.onend = () => {
+                isReading = false;
+                currentSpokenWord = "";
+                sendEvent('READING_DONE', {});
+                // The timer trigger has been removed from here so it doesn't fire after reading the result!
+            };
+
+            utterance.onerror = (e) => {
+                isReading = false;
+                sendEvent('READING_DONE', {});
+            };
+            
+            synth.speak(utterance);
+        }, 50);
+    } catch (err) {
+        sendEvent('READING_DONE', {});
+    }
+}
+
+// --- MICROPHONE RECORDING LOGIC (FOR GROQ WHISPER) ---
+let mediaRecorder = null;
+let audioChunks = [];
+let micStream = null;
+let recordTimeout = null;
+
+async function startListening(timeoutSeconds, expiresAt) {
+    const statusEl = document.getElementById('header-status');
+    const timeMs = timeoutSeconds * 1000;
+
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+    }
+    if (recordTimeout) {
+        clearTimeout(recordTimeout);
+    }
+    audioChunks = [];
+
+    try {
+        if (!micStream) {
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+        
+        mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm' });
+        
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            if (statusEl) statusEl.innerText = "🚀 Uploading Audio...";
+            
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = () => {
+                const base64Audio = reader.result;
+                sendEvent('ANSWER_AUDIO', { audio_data: base64Audio });
+            };
+        };
+
+        mediaRecorder.start();
+        if (statusEl) statusEl.innerText = "🎤 Recording (Groq Whisper)...";
+
+        recordTimeout = setTimeout(() => {
+            if (mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+        }, timeMs);
+
+    } catch (err) {
+        console.error("Microphone access denied or error:", err);
+        sendEvent('ANSWER_AUDIO', { audio_data: "" });
+    }
+}
+
+// --- MANUAL BACKUP BUZZERS ---
+document.addEventListener('keydown', function(event) {
+    if (document.activeElement.tagName === 'INPUT') return;
+    const key = event.key.toLowerCase();
+    if (key === 'a') sendEvent('BUZZ', { team: 'Team A', player: 'A-1' });
+    else if (key === 'b') sendEvent('BUZZ', { team: 'Team B', player: 'B-1' });
+});

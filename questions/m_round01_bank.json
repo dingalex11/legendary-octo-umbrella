@@ -1,0 +1,202 @@
+[
+  {
+    "category": "Life Science",
+    "type": "SA",
+    "tossup_text": "Life Science. Short Answer. What organelle functions to isolate a human cell’s chromosomes from the cytoplasm?",
+    "tossup_answer": "NUCLEUS",
+    "bonus_text": "Life Science. Short Answer. What is the primary oxygen-carrying protein found in red blood cells?",
+    "bonus_answer": "HEMOGLOBIN"
+  },
+  {
+    "category": "Physical Science",
+    "type": "SA",
+    "tossup_text": "Physical Science. Short Answer. What physical state of matter is intermediate between a solid and gas?",
+    "tossup_answer": "LIQUID",
+    "bonus_text": "Physical Science. Multiple Choice. Which of the following BEST describes the term static: W) stationary X) low Y) constant Z) used",
+    "bonus_answer": "W) STATIONARY"
+  },
+  {
+    "category": "Earth Science",
+    "type": "SA",
+    "tossup_text": "Earth Science. Short Answer. What is the general name for the rising and falling of sea levels in response to the forces exerted by the Moon and Sun?",
+    "tossup_answer": "TIDES",
+    "bonus_text": "Earth Science. Multiple Choice. Approximately what fraction of Earth’s surface is covered by oceans: W) one-half X) two-thirds Y) seven-tenths Z) four-fifths",
+    "bonus_answer": "Y) SEVEN-TENTHS"
+  },
+  {
+    "category": "Math",
+    "type": "SA",
+    "tossup_text": "Math. Short Answer. How many degrees are in one-third of a right angle?",
+    "tossup_answer": "30",
+    "bonus_text": "Math. Short Answer. Round the number 535,279 to the nearest ten-thousand:",
+    "bonus_answer": "540,000"
+  },
+  {
+    "category": "General Science",
+    "type": "SA",
+    "tossup_text": "General Science. Short Answer. The number 4.56 × 10 11 has how many zeroes?",
+    "tossup_answer": "9",
+    "bonus_text": "General Science. Short Answer. Giving your answer in grams, subtract 200 grams from 6.2 kilograms:",
+    "bonus_answer": "6,000 (ACCEPT: 6 × 103 )"
+  },
+  {
+    "category": "Life Science",
+    "type": "SA",
+    "tossup_text": "Life Science. Short Answer. How many permanent teeth does a typical adult human have?",
+    "tossup_answer": "32",
+    "bonus_text": "Life Science. Short Answer. How many canine teeth does the typical human adult have?",
+    "bonus_answer": "4"
+  },
+  {
+    "category": "Physical Science",
+    "type": "MC",
+    "tossup_text": "Physical Science. Multiple Choice. Mary tried to lift her couch by exerting 500 newtons of force but it doesn’t budge. If the couch weighed 2,000 newtons, how much work did she do: W) 0 X) 50 watts Y) 500 joules Z) 2000 joules",
+    "tossup_answer": "W) 0",
+    "bonus_text": "Physical Science. Short Answer. Jeff walks west in a straight path for 100 meters and then east in a straight path for 150 meters. What is the magnitude of his displacement, in meters?",
+    "bonus_answer": "50"
+  },
+  {
+    "category": "Earth Science",
+    "type": "MC",
+    "tossup_text": "Earth Science. Multiple Choice. The hydrologic cycle describes the circulation of Earth’s: W) tides X) water Y) sediments Z) rocks",
+    "tossup_answer": "X) WATER",
+    "bonus_text": "Earth Science. Short Answer. What is the name of the rock that makes up most of the ocean floor and volcanic ocean islands?",
+    "bonus_answer": "BASALT"
+  },
+  {
+    "category": "Math",
+    "type": "SA",
+    "tossup_text": "Math. Short Answer. In a right triangle, what is the name for the side opposite the 90º angle?",
+    "tossup_answer": "HYPOTENUSE",
+    "bonus_text": "Math. Short Answer. Rounded to the nearest meter, find the length of the hypotenuse of a right triangle if the legs measure 5 and 12 meters?",
+    "bonus_answer": "13 (Solution: 5 2 + 12 2 = c 2 ; c = 13)"
+  },
+  {
+    "category": "General Science",
+    "type": "SA",
+    "tossup_text": "General Science. Short Answer. What is the SI base unit for length?",
+    "tossup_answer": "METER",
+    "bonus_text": "General Science. Short Answer. Name all of the following 3 choices that are measurements units for speed: mach; newton; knots",
+    "bonus_answer": "MACH; KNOTS"
+  },
+  {
+    "category": "Life Science",
+    "type": "MC",
+    "tossup_text": "Life Science. Multiple Choice. Most of the heart is composed of which of the following types of tissues: W) epithelial X) connective Y) nervous Z) muscle",
+    "tossup_answer": "Z) MUSCLE",
+    "bonus_text": "Life Science. Short Answer. In the taxonomical name Homo sapiens , what taxonomical rank does sapiens represent?",
+    "bonus_answer": "SPECIES"
+  },
+  {
+    "category": "Physical Science",
+    "type": "SA",
+    "tossup_text": "Physical Science. Short Answer. What atomic particle balances the charge of protons to produce a neutral atom?",
+    "tossup_answer": "ELECTRON",
+    "bonus_text": "Physical Science. Short Answer. Isotopes of the same element are based on their different numbers of what atomic particle?",
+    "bonus_answer": "NEUTRONS"
+  },
+  {
+    "category": "Earth Science",
+    "type": "SA",
+    "tossup_text": "Earth Science. Short Answer. Which of the Gas giant planets is closest to the Sun?",
+    "tossup_answer": "JUPITER",
+    "bonus_text": "Earth Science. Short Answer. What are the 2 main factors causing the metamorphism of rocks?",
+    "bonus_answer": "HEAT AND PRESSURE (in any order)"
+  },
+  {
+    "category": "Math",
+    "type": "SA",
+    "tossup_text": "Math. Short Answer. What is the name for any segment with one endpoint at the center of a circle and the other endpoint on the circle?",
+    "tossup_answer": "RADIUS (ACCEPT: RADII)",
+    "bonus_text": "Math. Short Answer. Rounded to the nearest ten-thousandth, convert 3 1 rd to a decimal:",
+    "bonus_answer": "0.3333 (ACCEPT: .3333)"
+  },
+  {
+    "category": "General Science",
+    "type": "SA",
+    "tossup_text": "General Science. Short Answer. If there are 640 ounces of water in 5 gallons, how many ounces are in ½ gallon?",
+    "tossup_answer": "64",
+    "bonus_text": "General Science. Short Answer. Name all of the following 4 choices that are measurement units of area: meter; hectare; acre; mile",
+    "bonus_answer": "HECTARE; ACRE"
+  },
+  {
+    "category": "Life Science",
+    "type": "SA",
+    "tossup_text": "Life Science. Short Answer. What is generally considered the basic unit of life?",
+    "tossup_answer": "THE CELL",
+    "bonus_text": "Life Science. Short Answer. In what organelle of a plant cell does photosynthesis occur?",
+    "bonus_answer": "CHLOROPLAST (ACCEPT: PLASTID)"
+  },
+  {
+    "category": "Physical Science",
+    "type": "SA",
+    "tossup_text": "Physical Science. Short Answer. An ionic state of an atom of hydrogen would have how many protons?",
+    "tossup_answer": "1",
+    "bonus_text": "Physical Science. Short Answer. What is the name for the biochemical process that converts grape juice into wine or soy beans into soy sauce?",
+    "bonus_answer": "FERMENTATION"
+  },
+  {
+    "category": "Earth Science",
+    "type": "SA",
+    "tossup_text": "Earth Science. Short Answer. Giving your answer as north, south, east, or west, a southerly wind blows FROM what direction?",
+    "tossup_answer": "SOUTH",
+    "bonus_text": "Earth Science. Multiple Choice. Which of the following clouds has little vertical development: W) altostratus X) altocumulus Y) cirrus Z) nimbostratus",
+    "bonus_answer": "Y) CIRRUS"
+  },
+  {
+    "category": "Math",
+    "type": "SA",
+    "tossup_text": "Math. Short Answer. What is the exact circumference, in centimeters, of a circle whose radius is 3 centimeters?",
+    "tossup_answer": "6π",
+    "bonus_text": "Math. Short Answer. Change each of the following 3 fractions, respectively, to equivalent fractions with a denominator of 30: 3 1 ; 5 3 ; 6 5",
+    "bonus_answer": "30 10 ; 30 18 ; 30 25"
+  },
+  {
+    "category": "General Science",
+    "type": "SA",
+    "tossup_text": "General Science. Short Answer. What is the common name for the antiseptic, found in many homes, that decomposes into water and oxygen?",
+    "tossup_answer": "HYDROGEN PEROXIDE",
+    "bonus_text": "General Science. Short Answer. What is the chemical formula for hydrogen peroxide?",
+    "bonus_answer": "H 2 O 2"
+  },
+  {
+    "category": "Life Science",
+    "type": "SA",
+    "tossup_text": "Life Science. Short Answer. What is the scientific name for the white of a cooked egg?",
+    "tossup_answer": "ALBUMEN",
+    "bonus_text": "Life Science. Short Answer. What term is generally used for biological catalysts?",
+    "bonus_answer": "ENZYMES"
+  },
+  {
+    "category": "Physical Science",
+    "type": "SA",
+    "tossup_text": "Physical Science. Short Answer. What term do scientists use for the force of gravity acting on anything that has mass?",
+    "tossup_answer": "WEIGHT",
+    "bonus_text": "Physical Science. Short Answer. How many protons are present in a single helium nucleus?",
+    "bonus_answer": "2"
+  },
+  {
+    "category": "Earth Science",
+    "type": "MC",
+    "tossup_text": "Earth Science. Multiple Choice. A weather forecast of 100% relative humidity suggests an increased possibility of: W) rain X) wind Y) rising temperature Z) drying conditions",
+    "tossup_answer": "W) RAIN",
+    "bonus_text": "Earth Science. Short Answer. What is the name for all Great Circles that pass through the north and south poles?",
+    "bonus_answer": "LONGITUDES (ACCEPT: MERIDIANS)"
+  },
+  {
+    "category": "Math",
+    "type": "SA",
+    "tossup_text": "Math. Short Answer. Every triangle has how many vertices?",
+    "tossup_answer": "3",
+    "bonus_text": "Math. Short Answer. If the perimeter of a triangle is 45 centimeters and the lengths of two of its sides are 16 and 12 centimeters, find the length of the third side, in centimeters:",
+    "bonus_answer": "17"
+  },
+  {
+    "category": "General Science",
+    "type": "SA",
+    "tossup_text": "General Science. Short Answer. What general term describes the angle or degree north or south of the equator?",
+    "tossup_answer": "LATITUDE",
+    "bonus_text": "General Science. Short Answer. The geographic north pole is at what latitude?",
+    "bonus_answer": "90 (ACCEPT: 90º NORTH)"
+  }
+]
