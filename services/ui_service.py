@@ -19,7 +19,6 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 # 4. Import the moderator class safely
-from main import ScienceBowlModerator 
 
 app = FastAPI()
 
@@ -37,12 +36,17 @@ class RoomManager:
     """Manages WebSocket connections with room support"""
     def __init__(self):
         # Maps room_id to its own isolated game engine instance
-        self.rooms: Dict[str, ScienceBowlModerator] = {}
+        # ✅ Wrap type hint in quotes
+        self.rooms: Dict[str, 'ScienceBowlModerator'] = {}
         # Maps room_id to a list of connected WebSockets
         self.active_connections: Dict[str, List[WebSocket]] = {}
 
-    def get_or_create_room(self, room_id: str) -> ScienceBowlModerator:
+    # ✅ Wrap return type hint in quotes
+    def get_or_create_room(self, room_id: str) -> 'ScienceBowlModerator':
         if room_id not in self.rooms:
+            # ✅ Add the import locally here to break the cycle!
+            from main import ScienceBowlModerator 
+            
             # Initialize a fresh, isolated game engine for this new room
             moderator = ScienceBowlModerator()
             self.rooms[room_id] = moderator
@@ -58,7 +62,8 @@ class RoomManager:
             
         return self.rooms[room_id]
 
-    async def listen_for_outbound(self, room_id: str, moderator: ScienceBowlModerator):
+    # ✅ Wrap parameter type hint in quotes
+    async def listen_for_outbound(self, room_id: str, moderator: 'ScienceBowlModerator'):
         """Constantly reads the moderator's outbound queue and broadcasts it."""
         while True:
             message = await moderator.outbound_queue.get()
