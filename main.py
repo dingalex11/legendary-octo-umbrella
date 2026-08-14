@@ -97,8 +97,6 @@ class ScienceBowlModerator:
             self.state.transition_to(GameState.IDLE)
             self.match_log = []
             
-            print(f"\n[DEBUG]: Dynamically loaded {len(self.question_bank)} questions from UI.")
-            
             await self.outbound_queue.put({"type": "UPDATE_SCORE", "payload": {"score_a": 0, "score_b": 0}})
             await self.outbound_queue.put({"type": "UPDATE_STATUS", "payload": {"text": f"✅ Loaded {len(self.question_bank)} new questions."}})
             
@@ -240,7 +238,7 @@ class ScienceBowlModerator:
         while True:
             event = await self.inbound_queue.get()
             evt_type = event.type.name if hasattr(event.type, 'name') else str(event.type)
-            
+            print(f"📥 [DEBUG]: Queue received event -> {evt_type}")
             if evt_type in admin_events:
                 if evt_type not in ["PING", "PAUSE_MATCH"]:
                     await self.process_admin_event(event)
@@ -522,6 +520,8 @@ class ScienceBowlModerator:
                 await self.outbound_queue.put({"type": "UI_STATE", "payload": {"show": "TOSSUP"}})
                 
                 action = await self.wait_for_moderator_action(["MANUAL_START_TOSSUP"])
+                
+
                 action_type = action.type.name if hasattr(action.type, 'name') else str(action.type)
                 if action_type == "FORCE_RESET_STATE": continue 
                 elif action_type == "CHALLENGE":

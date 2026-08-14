@@ -1,0 +1,38 @@
+Moderator View
+
+The Moderator View will be the private "control center" where the human reader manages the game.Here is a comprehensive blueprint for structuring the Moderator View:
+
+I. Access & Architecture (The Routing)
+    We don't want the moderator UI mixed up with the projector UI. We have two options for access:
+        The URL Parameter (Recommended): We can use a URL query like http://localhost:8080/?room=room_a&role=mod. In your ui.js, if role=mod is detected, we hide the standard <div id="view-match"> and instead unhide a brand new <div id="view-moderator">.  
+
+        The Standalone Page: Create a completely separate moderator.html file to keep the DOM clean and prevent accidental screen-sharing of the answers.
+
+II. Layout & Visual Hierarchy (The Wireframe)
+    A moderator needs to read quickly, monitor the AI's transcription, and intervene instantly. The layout should be split into three distinct zones:
+
+    1. The Top Bar (Global Meta)
+        Room Code: Clearly displayed so they know they are in the right instance.
+        Match Clock & Play/Pause: A prominent timer with a massive Pause button.Live Scores: Team A vs. Team B totals.  
+
+    2. The Main Column (The "Teleprompter")
+        This is where our pdf_parser.js upgrades shine. This section needs large, highly readable typography.
+        Question Metadata: Category (e.g., BIOLOGY) and Type (Short Answer vs. Multiple Choice).
+        The Prompt: The actual question text.
+        The MC Grid (If Applicable): A 2x2 grid displaying the tossup_options or bonus_options arrays we extracted (W, X, Y, Z). This allows the moderator to easily read the choices aloud.  
+        The Official Answer: Highlighted in a neon color (e.g., Amber or Emerald) so it is impossible to miss.
+        AI Transcription Feed: A live-updating text box showing exactly what the Groq Whisper AI heard the student say (via the UPDATE_STATUS event).  
+
+    3. The Right Sidebar (The Control Deck)This panel replaces your current "Moderator Control Bar" and centralizes all game state commands.  
+        Flow Controls: Giant buttons for START TOSSUP, RE-READ TOSSUP, and START BONUS.  
+        AI Overrides: If the AI Judge makes a mistake, the moderator needs big, immediate buttons for FORCE CORRECT and FORCE INCORRECT (triggering the FORCE_JUDGMENT event).  
+        Hardware Fallbacks: Buttons for FORCE BUZZ A and FORCE BUZZ B in case the computer vision / physical buzzers fail.  
+        Exception Handling: A CHALLENGE (SKIP) button to kill a dead or contested question.  
+
+III. Bottom Section (The Editable Scoresheet)
+    Just like your current match view, the bottom of the screen should feature the running log of the game.  
+        Live Table: A row for every question detailing the player, buzz point, and points awarded.
+
+        Inline Editing: By double-clicking a cell (which you've already stubbed out in websocket.js), the moderator can retroactively fix a score, triggering a full score recalculation across the board.  
+
+

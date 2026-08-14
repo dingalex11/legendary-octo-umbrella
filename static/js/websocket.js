@@ -78,10 +78,10 @@ document.addEventListener('click', () => {
 }, { once: true });
 
 // --- MAIN WEBSOCKET CONNECTION ---
-// --- MAIN WEBSOCKET CONNECTION ---
 function connectWebSocket(roomId) {
     // 1. Connect to the dynamic room endpoint
-    ws = new WebSocket(`ws://${window.location.host}/ws/${roomId}`);
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/${roomId}`);
 
     ws.onopen = () => {
         const statusEl = document.getElementById('header-status');
