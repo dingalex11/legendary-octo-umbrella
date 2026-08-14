@@ -11,7 +11,7 @@ function switchTab(tab) {
         return;
     }
 
-    const views = ['landing', 'match', 'setup', 'tools', 'analytics']; 
+    const views = ['landing', 'match', 'setup', 'tools', 'analytics','lobby']; 
     
     views.forEach(v => {
         const el = document.getElementById('view-' + v);
@@ -148,6 +148,32 @@ if (bankFileInput) {
             }
         }
     });
+}
+let currentRoomId = null;
+
+function joinRoom() {
+    const input = document.getElementById('room-id-input');
+    
+    if (input && input.value.trim() !== '') {
+        currentRoomId = input.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        
+        // Hide Lobby, Show Landing
+        const lobbyView = document.getElementById('view-lobby');
+        const landingView = document.getElementById('view-landing');
+        if (lobbyView) {
+            lobbyView.classList.add('hidden');
+            lobbyView.classList.remove('flex');
+        }
+        if (landingView) {
+            landingView.classList.remove('hidden');
+            landingView.classList.add('flex');
+        }
+        
+        // Boot up the WebSocket specific to this room
+        connectWebSocket(currentRoomId);
+    } else {
+        alert("⚠️ Please enter a valid room code.");
+    }
 }
 
 function confirmSetup() {

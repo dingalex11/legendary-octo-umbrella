@@ -78,12 +78,14 @@ document.addEventListener('click', () => {
 }, { once: true });
 
 // --- MAIN WEBSOCKET CONNECTION ---
-function connectWebSocket() {
-    ws = new WebSocket(`ws://${window.location.host}/ws`);
+// --- MAIN WEBSOCKET CONNECTION ---
+function connectWebSocket(roomId) {
+    // 1. Connect to the dynamic room endpoint
+    ws = new WebSocket(`ws://${window.location.host}/ws/${roomId}`);
 
     ws.onopen = () => {
         const statusEl = document.getElementById('header-status');
-        if (statusEl) statusEl.innerText = 'READY';
+        if (statusEl) statusEl.innerText = `READY (ROOM: ${roomId.toUpperCase()})`;
         
         reconnectDelay = 2000; 
         
@@ -94,6 +96,13 @@ function connectWebSocket() {
             }
         }, 15000);
     };
+
+    // ... Keep the rest of your ws.onmessage and ws.onclose exactly the same ...
+    // BUT update the reconnect logic inside ws.onclose to pass the roomId again:
+    // setTimeout(() => connectWebSocket(roomId), reconnectDelay);
+
+// REMOVE OR COMMENT OUT THIS LINE AT THE BOTTOM OF THE FILE
+// connectWebSocket();
 
     ws.onmessage = function(event) {
         const data = JSON.parse(event.data);
@@ -385,12 +394,10 @@ function connectWebSocket() {
         
         if (pingInterval) clearInterval(pingInterval);
         
-        setTimeout(connectWebSocket, reconnectDelay);
+        setTimeout(connectWebSocket(roomId), reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
     };
 }
-
-connectWebSocket();
 
 function sendEvent(eventType, payload = {}) {
     if (ws && ws.readyState === WebSocket.OPEN) {

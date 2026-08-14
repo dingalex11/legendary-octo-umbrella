@@ -10,7 +10,8 @@ const pdfCountBadge = document.getElementById('pdf-count-badge');
 let currentParsedData = null;
 let currentPdfFileName = "parsed_bank";
 
-if(pdfDropZone) {
+// --- DRAG & DROP EVENT LISTENERS ---
+if (pdfDropZone) {
     pdfDropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         pdfDropZone.classList.add('dragover');
@@ -29,7 +30,7 @@ if(pdfDropZone) {
     });
 }
 
-if(pdfFileInput) {
+if (pdfFileInput) {
     pdfFileInput.addEventListener('change', (e) => {
         if (e.target.files.length) {
             handlePDFFile(e.target.files[0]);
@@ -37,6 +38,36 @@ if(pdfFileInput) {
     });
 }
 
+// --- LIVE INLINE EDITOR SETUP ---
+if (pdfOutputJSON) {
+    // Make the pre block editable
+    pdfOutputJSON.setAttribute('contenteditable', 'true');
+    pdfOutputJSON.addEventListener('input', validateLiveJSON);
+}
+
+function validateLiveJSON() {
+    try {
+        // Attempt to parse the user's manual edits
+        const parsed = JSON.parse(pdfOutputJSON.innerText);
+        currentParsedData = parsed; 
+        
+        // Success UI State
+        pdfOutputJSON.classList.remove('border-red-500', 'text-red-400');
+        pdfStatusText.innerText = "EXTRACTION COMPLETE (VALID JSON)";
+        pdfStatusText.className = "text-xs font-mono mt-1 block uppercase text-teamA font-bold";
+        pdfDownloadBtn.disabled = false;
+        pdfCopyBtn.disabled = false;
+    } catch (err) {
+        // Error UI State
+        pdfOutputJSON.classList.add('border-red-500', 'text-red-400');
+        pdfStatusText.innerText = "⚠️ INVALID JSON SYNTAX";
+        pdfStatusText.className = "text-xs font-mono mt-1 block uppercase text-red-500 font-bold animate-pulse";
+        pdfDownloadBtn.disabled = true;
+        pdfCopyBtn.disabled = true;
+    }
+}
+
+// --- MAIN PDF HANDLER ---
 async function handlePDFFile(file) {
     if (file.type !== 'application/pdf') {
         alert("Please provide a valid PDF file.");
@@ -53,22 +84,21 @@ async function handlePDFFile(file) {
         
         currentParsedData = parsedQuestions;
         
-        pdfOutputJSON.textContent = JSON.stringify(parsedQuestions, null, 2);
-        pdfStatusText.innerText = "EXTRACTION COMPLETE";
-        pdfStatusText.className = "text-xs font-mono mt-1 block uppercase text-teamA font-bold";
+        // Pretty print to the editable output block
+        pdfOutputJSON.innerText = JSON.stringify(parsedQuestions, null, 2);
+        
+        // Trigger the validation success state
+        validateLiveJSON();
         
         pdfCountBadge.style.display = "block";
         pdfCountBadge.innerText = `${parsedQuestions.length} SETS EXTRACTED`;
         pdfCountBadge.className = "bg-teal-950 text-teamA border border-teal-800 px-2 py-1 rounded text-xs font-mono font-bold";
 
-        pdfDownloadBtn.disabled = false;
-        pdfCopyBtn.disabled = false;
-
     } catch (err) {
         console.error(err);
         pdfStatusText.innerText = "ERROR PARSING PDF";
         pdfStatusText.className = "text-xs font-mono mt-1 block uppercase text-red-500 font-bold";
-        pdfOutputJSON.textContent = "// Error: " + err.message;
+        pdfOutputJSON.innerText = "// Error: " + err.message;
     } finally {
         setPDFLoadingState(false);
     }
@@ -78,20 +108,18 @@ function setPDFLoadingState(isLoading) {
     if (isLoading) {
         pdfLoader.style.display = 'block';
         pdfDropZone.style.pointerEvents = 'none';
-        
         pdfDropZone.querySelectorAll('span:not(#pdf-loader), b').forEach(el => el.style.opacity = '0');
-        
         pdfStatusText.innerText = "PROCESSING PDF DATA...";
         pdfStatusText.className = "text-xs font-mono mt-1 block uppercase text-amber-500 font-bold";
-        pdfOutputJSON.textContent = "// Extracting text...";
+        pdfOutputJSON.innerText = "// Extracting text...";
     } else {
         pdfLoader.style.display = 'none';
         pdfDropZone.style.pointerEvents = 'auto';
-        
         pdfDropZone.querySelectorAll('span:not(#pdf-loader), b').forEach(el => el.style.opacity = '1');
     }
 }
 
+// --- PHASE 1: DYNAMIC SANITIZATION ---
 async function extractCleanText(arrayBuffer) {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = "";
@@ -104,52 +132,105 @@ async function extractCleanText(arrayBuffer) {
     }
 
     fullText = fullText.replace(/\r\n|\r/g, "\n");
-    fullText = fullText.replace(/(?:High|Middle)\s+School\s+Round\s+\d+\s+Page\s+\d+/gi, "");
+    
+    // Wipe out repeating line dividers (e.g. ~~~~ or ----)
+    fullText = fullText.replace(/[~_-]{5,}/g, "");
+    
+    // Wipe out known footers based on tournament styles
     fullText = fullText.replace(/Page\s+\d+/gi, "");
-    fullText = fullText.replace(/\(read as:.*?\)/gi, "");
+    fullText = fullText.replace(/(?:High|Middle)\s+School\s+Round\s+\d+/gi, "");
+    fullText = fullText.replace(/STANFORD SCIENCE BOWL/gi, "");
+    fullText = fullText.replace(/\d{4}\s+MHS/gi, "");
+    fullText = fullText.replace(/MIT Science Bowl Invitational Round \d+/gi, "");
 
     return fullText;
 }
 
+// --- PHASE 2 & 3: TOKENIZATION AND STATE MACHINE ---
 function parseScienceBowlText(rawText) {
+    // Split the document into question chunks via positive lookahead
+    const chunkRegex = /(?=TOSSUP|TOSS-UP|BONUS|VISUAL BONUS)/gi;
+    const chunks = rawText.split(chunkRegex).map(c => c.trim()).filter(c => c.length > 20);
+
     const questions = [];
-    const blockPattern = /(?:TOSSUP|TOSS-UP|BONUS)\s*\d*[\.\)]?\s*(?:([A-Za-z\s]+?)\s*[,:]?\s*)?(Short Answer|Multiple Choice|MULTIPLE CHOICE|SHORT ANSWER)\s+(.*?)ANSWER:\s*(.*?)(?=(?:TOSSUP|TOSS-UP|BONUS|$))/gsi;
-    const matches = [...rawText.matchAll(blockPattern)];
     let currentSet = null;
 
-    for (const match of matches) {
-        let categoryRaw = match[1] ? match[1].trim() : "General Science";
-        let typeRaw = match[2] ? match[2].trim() : "Short Answer";
-        let bodyRaw = match[3] ? match[3] : "";
-        let answerRaw = match[4] ? match[4] : "";
+    for (let chunk of chunks) {
+        const isBonus = /^(?:VISUAL )?BONUS/i.test(chunk);
+        const isVisual = /^VISUAL/i.test(chunk);
+        const isTossup = /^TOSS-?UP/i.test(chunk);
 
-        let categoryClean = titleCase(categoryRaw);
-        let qTypeClean = titleCase(typeRaw);
-        let qBodyClean = bodyRaw.replace(/\s+/g, " ").trim();
-        let answerClean = answerRaw.replace(/\s+/g, " ").trim();
+        if (!isBonus && !isTossup) continue;
+
+        // Extract the Answer block
+        const answerSplit = chunk.split(/ANSWER:/i);
+        if (answerSplit.length < 2) continue;
+
+        let bodyAndMeta = answerSplit[0];
+        let rawAnswer = answerSplit[1].replace(/\s+/g, " ").trim();
+
+        // Extract Metadata (Category and Type)
+        const metaMatch = bodyAndMeta.match(/(Biology|Chemistry|Physics|Math|Earth and Space|Earth Science|Energy)[\s–-]*([^ \n]+ (?:Choice|Answer))/i);
         
-        let typeCode = qTypeClean.toLowerCase().includes("multiple") ? "MC" : "SA";
+        let category = "General Science";
+        let type = "SA";
 
-        answerClean = answerClean.replace(/\[[A-Z0-9\s]+\]$/i, "").trim();
-        answerClean = answerClean.replace(/\s*(?:High|Middle)?\s*School\s*Round.*$/i, "").trim();
-        answerClean = answerClean.replace(/\s*Page\s*\d+.*$/i, "").trim();
+        if (metaMatch) {
+            category = titleCase(metaMatch[1].trim());
+            type = metaMatch[2].toLowerCase().includes("multiple") ? "MC" : "SA";
+        } else if (bodyAndMeta.toLowerCase().includes("multiple choice")) {
+            type = "MC";
+        }
 
-        let formattedQuestion = `${categoryClean}. ${qTypeClean}. ${qBodyClean}`;
+        // Clean up the body by removing structural headers
+        let cleanBody = bodyAndMeta
+            .replace(/^(?:VISUAL )?(?:TOSS-?UP|BONUS)\s*\d*[\.\)]?/i, "")
+            .replace(/(Biology|Chemistry|Physics|Math|Earth and Space|Earth Science|Energy)[\s–-]+(?:Multiple Choice|Short Answer)/i, "")
+            .replace(/\s+/g, " ")
+            .trim();
 
-        if (currentSet === null) {
+        // Phase 4: Extract W, X, Y, Z for Multiple Choice
+        let options = [];
+        if (type === "MC") {
+            // Looks for the specific W) X) Y) Z) patterns
+            const optionsMatch = cleanBody.match(/(W\).*?)(X\).*?)(Y\).*?)(Z\).*)$/i);
+            if (optionsMatch) {
+                options = [
+                    optionsMatch[1].trim(),
+                    optionsMatch[2].trim(),
+                    optionsMatch[3].trim(),
+                    optionsMatch[4].trim()
+                ];
+                // Remove the options from the main text body so the TTS reader doesn't read them improperly
+                cleanBody = cleanBody.replace(/(W\).*?)(X\).*?)(Y\).*?)(Z\).*)$/i, "").trim();
+            }
+        }
+
+        let formattedQuestion = `${category}. ${type === 'MC' ? 'Multiple Choice' : 'Short Answer'}. ${cleanBody}`;
+
+        // Package the Question Object
+        if (isTossup || !currentSet) {
             currentSet = {
-                category: categoryClean,
-                type: typeCode,
+                category: category,
+                type: type,
                 tossup_text: formattedQuestion,
-                tossup_answer: answerClean,
+                tossup_answer: rawAnswer,
+                tossup_options: options,
+                tossup_visual: isVisual,
                 bonus_text: "",
-                bonus_answer: ""
+                bonus_answer: "",
+                bonus_options: [],
+                bonus_visual: false
             };
-        } else {
+        } else if (isBonus && currentSet) {
             currentSet.bonus_text = formattedQuestion;
-            currentSet.bonus_answer = answerClean;
+            currentSet.bonus_answer = rawAnswer;
+            currentSet.bonus_options = options;
+            currentSet.bonus_visual = isVisual;
             questions.push(currentSet);
-            currentSet = null;
+            
+            // Reset for the next Tossup/Bonus pair
+            currentSet = null; 
         }
     }
 
@@ -166,6 +247,7 @@ function titleCase(str) {
     }).join(' ');
 }
 
+// --- EXPORT UTILITIES ---
 function downloadJSON() {
     if (!currentParsedData) return;
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentParsedData, null, 2));

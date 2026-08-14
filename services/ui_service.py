@@ -6,6 +6,83 @@ from fastapi.staticfiles import StaticFiles
 from core.events import Event
 import uvicorn
 import os
+
+import os
+import asyncio
+import json
+from typing import Dict, List
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+
+# Adjust the import based on where your moderator class lives
+from backend.moderator import ScienceBowlModerator 
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class RoomManager:
+    """Manages WebSocket connections with room support"""
+    def __init__(self):
+        # Maps room_id to its own isolated game engine instance
+        self.rooms: Dict[str, ScienceBowlModerator] = {}
+        # Maps room_id to a list of connected WebSockets
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    def get_or_create_room(self, room_id: str) -> ScienceBowlModerator:
+        if room_id not in self.rooms:
+            # Initialize a fresh, isolated game engine for this new room
+            moderator = ScienceBowlModerator()
+            self.rooms[room_id] = moderator
+            self.active_connections[room_id] = []
+            
+            # Start the background game loop for this specific room
+            asyncio.create_task(moderator.run_game_loop())
+            
+            # Start the background task to route outbound messages to room clients
+            asyncio.create_task(self.listen_for_outbound(room_id, moderator))
+            
+            print(f"🚀 Room created: {room_id}")
+            
+        return self.rooms[room_id]
+
+    async def listen_for_outbound(self, room_id: str, moderator: ScienceBowlModerator):
+        """Constantly reads the moderator's outbound queue and broadcasts it."""
+        while True:
+            # Wait for the game engine to generate a payload (e.g., score update)
+            message = await moderator.outbound_queue.get()
+            await self.broadcast_to_room(room_id, message)
+
+    async def connect(self, websocket: WebSocket, room_id: str):
+        await websocket.accept()
+        self.get_or_create_room(room_id)
+        self.active_connections[room_id].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, room_id: str):
+        if room_id in self.active_connections:
+            self.active_connections[room_id].remove(websocket)
+            # Optional cleanup: Delete the room from RAM if everyone leaves
+            # if not self.active_connections[room_id]:
+            #     del self.rooms[room_id]
+            #     del self.active_connections[room_id]
+
+    async def broadcast_to_room(self, room_id: str, message: dict):
+        if room_id in self.active_connections:
+            for connection in self.active_connections[room_id]:
+                try:
+                    await connection.send_text(json.dumps(message))
+                except RuntimeError:
+                    # Safely ignore disconnected clients
+                    pass
+
+manager = RoomManager()
+
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -99,3 +176,21 @@ async def websocket_endpoint(websocket: WebSocket):
                 
     except WebSocketDisconnect:
         ui_service.disconnect(websocket)
+
+@app.websocket("/ws/{room_id}")
+async def websocket_endpoint(websocket: WebSocket, room_id: str):
+    await manager.connect(websocket, room_id)
+    moderator = manager.get_or_create_room(room_id)
+    
+    try:
+        while True:
+            # 1. Receive data from a client in this room
+            data = await websocket.receive_text()
+            payload = json.loads(data)
+            
+            # 2. Feed it into this specific room's game engine
+            await moderator.inbound_queue.put(payload)
+            
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, room_id)
+        print(f"Client disconnected from room {room_id}")

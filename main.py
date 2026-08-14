@@ -11,7 +11,8 @@ import numpy as np
 import cv2
 from pathlib import Path
 from dotenv import load_dotenv
-
+import os
+import uvicorn
 load_dotenv()
 
 from core.events import Event, EventType
@@ -173,7 +174,6 @@ class ScienceBowlModerator:
                             entry["Correct"] = entry["Points"] > 0
                             
                     # --- BONUS EDIT LOGIC ---
-                    # --- BONUS EDIT LOGIC ---
                     elif column == "BONUS" and entry.get("Event_Type") == "BONUS":
                         tokens = new_val.split()
                         if len(tokens) >= 1:
@@ -231,7 +231,6 @@ class ScienceBowlModerator:
                 print(f"❌ [FRAME DECODE ERROR]: {e}")
 
     async def wait_for_moderator_action(self, expected_event_types: list):
-        # Now accepts a list of events to wait for (e.g. START_BONUS or FORCE_JUDGMENT)
         if isinstance(expected_event_types, str):
             expected_event_types = [expected_event_types]
             
@@ -288,8 +287,12 @@ class ScienceBowlModerator:
         tossup_answer = str(q_data.get('tossup_answer', '')).strip()
         category = str(q_data.get('category', 'GENERAL')).strip()
         
+        # Format multiple choice options for TTS
+        tossup_options = q_data.get('tossup_options', [])
+        options_spoken = " ".join(tossup_options) if tossup_options else ""
+        
         prefix = f"Reading for {allowed_team} only. " if allowed_team else ""
-        text_to_read = prefix + f"Tossup,  " + tossup_text
+        text_to_read = prefix + f"Tossup,  " + tossup_text + "  " + options_spoken
         
         safe_display_text = text_to_read if text_to_read else "[WARNING: PYTHON MEMORY HAS NO TEXT FOR THIS QUESTION]"
 
@@ -298,7 +301,9 @@ class ScienceBowlModerator:
         await self.outbound_queue.put({"type": "UPDATE_QUESTION", "payload": {
             "text": safe_display_text,
             "answer": tossup_answer,
-            "category": category
+            "category": category,
+            "options": q_data.get('tossup_options', []),
+            "visual": q_data.get('tossup_visual', False)
         }})
         
         if not skip_read:
@@ -446,7 +451,6 @@ class ScienceBowlModerator:
                 "payload": {"timeout": 8.0, "expires_at": current_sys_time + 8.0}
             })
             try:
-                # Increased timeout to 12.0 to give the browser time to encode and upload the audio file
                 while True:
                     reply = await asyncio.wait_for(self.inbound_queue.get(), timeout=12.0)
                     evt_type = reply.type.name if hasattr(reply.type, 'name') else str(reply.type)
@@ -503,7 +507,9 @@ class ScienceBowlModerator:
                 await self.outbound_queue.put({"type": "UPDATE_QUESTION", "payload": {
                     "text": safe_preload_text if safe_preload_text else "[WARNING: PYTHON MEMORY HAS NO TEXT FOR THIS QUESTION]", 
                     "answer": str(q_data.get('tossup_answer', '')),
-                    "category": str(q_data.get('category', 'GENERAL'))
+                    "category": str(q_data.get('category', 'GENERAL')),
+                    "options": q_data.get('tossup_options', []),
+                    "visual": q_data.get('tossup_visual', False)
                 }})
                 
                 # TELL UI TO ONLY SHOW TOSSUP BUTTON
@@ -643,7 +649,9 @@ class ScienceBowlModerator:
                     await self.outbound_queue.put({"type": "UPDATE_QUESTION", "payload": {
                         "text": safe_bonus_preload if safe_bonus_preload else "[WARNING: PYTHON MEMORY HAS NO BONUS TEXT]", 
                         "answer": str(q_data.get('bonus_answer', '')),
-                        "category": str(q_data.get('category', 'GENERAL'))
+                        "category": str(q_data.get('category', 'GENERAL')),
+                        "options": q_data.get('bonus_options', []),
+                        "visual": q_data.get('bonus_visual', False)
                     }})
                     
                     # TELL UI TO ONLY SHOW BONUS BUTTON
@@ -665,7 +673,10 @@ class ScienceBowlModerator:
                     await self.outbound_queue.put({"type": "UPDATE_STATUS", "payload": {"text": "🔊 Reading Bonus..."}})
                     
                     raw_bonus = str(q_data.get('bonus_text', '')).strip()
-                    bonus_text_to_read = f"Bonus, " + raw_bonus if raw_bonus else ""
+                    bonus_options = q_data.get('bonus_options', [])
+                    bonus_options_spoken = " ".join(bonus_options) if bonus_options else ""
+                    
+                    bonus_text_to_read = f"Bonus, " + raw_bonus + "  " + bonus_options_spoken if raw_bonus else ""
                     
                     if self.use_audio and bonus_text_to_read:
                         await self.outbound_queue.put({"type": "START_READING", "payload": {"text": bonus_text_to_read}})
@@ -851,4 +862,12 @@ async def main():
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Dynamically grab the port for Render deployment
+    port = int(os.environ.get("PORT", 8080))
+    
+    print("==================================================")
+    print(f"🚀 [SYSTEM LIVE]: Multi-Room Server booting on port {port}")
+    print("==================================================")
+    
+    # Run the FastAPI app directly from the UI service
+    uvicorn.run("services.ui_service:app", host="0.0.0.0", port=port)

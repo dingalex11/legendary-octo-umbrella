@@ -1,0 +1,19 @@
+# Environments
+.env
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Match Data & Analytics
+*.csv
+agentic_speed_interrupt_stats.csv
+
+# OS generated files
+.DS_Store
+Thumbs.db
