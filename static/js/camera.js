@@ -259,3 +259,13 @@ function drawExistingBoxes() {
         }
     });
 }
+// FIX: Press 'Escape' to cancel drawing a box
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isDrawing) {
+        isDrawing = false; // Stop the drawing process
+        
+        // Clear the temporary box off the screen and redraw saved boxes
+        drawRectangles(); 
+        console.log("Drawing canceled via Escape key.");
+    }
+});
