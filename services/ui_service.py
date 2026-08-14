@@ -79,6 +79,16 @@ class RoomManager:
         if room_id in self.active_connections:
             if websocket in self.active_connections[room_id]:
                 self.active_connections[room_id].remove(websocket)
+            
+            # 🧹 AUTO-CLEANUP: If no connections are left in this room, wipe it!
+            if not self.active_connections[room_id]:
+                del self.active_connections[room_id]
+                if room_id in self.rooms:
+                    # Optional: cancel tasks or let garbage collection handle the moderator
+                    del self.rooms[room_id]
+                print(f"🗑️ Room deleted (empty): {room_id}")
+
+        print(f"Client disconnected from room {room_id}")
 
     async def broadcast_to_room(self, room_id: str, message: dict):
         if room_id in self.active_connections:
