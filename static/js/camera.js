@@ -200,31 +200,25 @@ if(canvas) {
     canvas.addEventListener('mouseup', (e) => {
         if (!isDrawing) return;
         isDrawing = false;
-        const pos = getMousePos(e);
 
-        const x1 = Math.min(startX, pos.x) / canvas.width;
-        const y1 = Math.min(startY, pos.y) / canvas.height;
-        const x2 = Math.max(startX, pos.x) / canvas.width;
-        const y2 = Math.max(startY, pos.y) / canvas.height;
+        const rect = canvas.getBoundingClientRect();
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
 
-        if (x2 - x1 < 0.02 || y2 - y1 < 0.02) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawExistingBoxes();
-            return;
+        const width = Math.abs(endX - startX);
+        const height = Math.abs(endY - startY);
+
+        // FIX: Replaced the 2% canvas limit with a simple 3-pixel minimum
+        if (width > 3 && height > 3) {
+            const x = Math.min(startX, endX);
+            const y = Math.min(startY, endY);
+            
+            // Save your micro-box
+            rectangles.push({ x, y, width, height });
         }
 
-        mappingData[seatsToMap[currentSeatIdx]] = [
-            parseFloat(x1.toFixed(3)), parseFloat(y1.toFixed(3)), 
-            parseFloat(x2.toFixed(3)), parseFloat(y2.toFixed(3))
-        ];
-
-        currentSeatIdx++;
-        if (currentSeatIdx < seatsToMap.length) {
-            if(instructionText) instructionText.innerText = `Draw Box: ${seatsToMap[currentSeatIdx]}`;
-        } else {
-            if(instructionText) instructionText.innerText = "Draw Box: All seats mapped! Click Save.";
-        }
-        drawExistingBoxes();
+        // Redraw the canvas to show the saved boxes
+        drawRectangles();
     });
 }
 
@@ -259,3 +253,14 @@ function drawExistingBoxes() {
         }
     });
 }
+
+// FIX: Press 'Escape' to cancel drawing a box
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isDrawing) {
+        isDrawing = false; // Stop the drawing process
+        
+        // Clear the temporary box off the screen and redraw saved boxes
+        drawRectangles(); 
+        console.log("Drawing canceled via Escape key.");
+    }
+});

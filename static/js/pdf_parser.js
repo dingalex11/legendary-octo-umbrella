@@ -170,7 +170,8 @@ function parseScienceBowlText(rawText) {
         let rawAnswer = answerSplit[1].replace(/\s+/g, " ").trim();
 
         // Extract Metadata (Category and Type)
-        const metaMatch = bodyAndMeta.match(/(Biology|Chemistry|Physics|Math|Earth and Space|Earth Science|Energy)[\s–-]*([^ \n]+ (?:Choice|Answer))/i);
+        // FIX: Added Life Science, Physical Science, and General Science to the regex
+        const metaMatch = bodyAndMeta.match(/(Biology|Chemistry|Physics|Math|Earth and Space|Earth Science|Energy|Life Science|Physical Science|General Science)[\s–-]*([^ \n]+ (?:Choice|Answer))/i);
         
         let category = "General Science";
         let type = "SA";
@@ -183,9 +184,10 @@ function parseScienceBowlText(rawText) {
         }
 
         // Clean up the body by removing structural headers
+        // FIX: Match the updated categories here so they are cleanly stripped from the spoken text
         let cleanBody = bodyAndMeta
             .replace(/^(?:VISUAL )?(?:TOSS-?UP|BONUS)\s*\d*[\.\)]?/i, "")
-            .replace(/(Biology|Chemistry|Physics|Math|Earth and Space|Earth Science|Energy)[\s–-]+(?:Multiple Choice|Short Answer)/i, "")
+            .replace(/(Biology|Chemistry|Physics|Math|Earth and Space|Earth Science|Energy|Life Science|Physical Science|General Science)[\s–-]+(?:Multiple Choice|Short Answer)/i, "")
             .replace(/\s+/g, " ")
             .trim();
 
