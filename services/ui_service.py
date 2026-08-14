@@ -13,9 +13,21 @@ import json
 from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+import sys
+import os
 
+# 1. Get the absolute path of the current subfolder
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 2. Go up one level to the root project directory
+parent_dir = os.path.dirname(current_dir)
+
+# 3. Add the root directory to Python's system path
+sys.path.append(parent_dir)
+
+# 4. NOW you can safely import from main!
 # Adjust the import based on where your moderator class lives
-from backend.moderator import ScienceBowlModerator 
+from main import ScienceBowlModerator 
 
 app = FastAPI()
 
