@@ -234,7 +234,8 @@ class ScienceBowlModerator:
         if isinstance(expected_event_types, str):
             expected_event_types = [expected_event_types]
             
-        admin_events = ["EXPORT_CSV", "SAVE_CALIBRATION", "RESET_CALIBRATION", "CALIBRATE_BASELINE", "PROCESS_FRAME", "PING", "UPDATE_STATUS", "PAUSE_MATCH", "ADJUST_SCORE", "EDIT_LOG_ENTRY", "FORCE_ACCEPT"]
+        # NEW: Added LOAD_BANK, SAVE_ROSTER, and EDIT_LOG_ENTRY to prevent them from being ignored
+        admin_events = ["EXPORT_CSV", "SAVE_CALIBRATION", "RESET_CALIBRATION", "CALIBRATE_BASELINE", "PROCESS_FRAME", "PING", "UPDATE_STATUS", "PAUSE_MATCH", "ADJUST_SCORE", "EDIT_LOG_ENTRY", "FORCE_ACCEPT", "LOAD_BANK", "SAVE_ROSTER"]
         
         while True:
             event = await self.inbound_queue.get()
@@ -247,7 +248,7 @@ class ScienceBowlModerator:
                 
             if evt_type in expected_event_types:
                 return event
-            elif evt_type == ["FORCE_RESET_STATE", "CHALLENGE"]:
+            elif evt_type in ["FORCE_RESET_STATE", "CHALLENGE"]:
                 return Event(type="FORCE_RESET_STATE")
 
     async def _speak_and_wait(self, text: str):
@@ -497,6 +498,11 @@ class ScienceBowlModerator:
         try:
             while True:
                 if not self.question_bank or self.current_q_idx >= len(self.question_bank):
+                    # NEW: Process the queue so LOAD_BANK and SAVE_ROSTER don't get stuck forever
+                    while not self.inbound_queue.empty():
+                        evt = self.inbound_queue.get_nowait()
+                        await self.process_admin_event(evt)
+                    
                     await asyncio.sleep(1)
                     continue
                 q_data = self.question_bank[self.current_q_idx]

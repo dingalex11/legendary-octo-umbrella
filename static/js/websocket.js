@@ -394,7 +394,8 @@ function connectWebSocket(roomId) {
         
         if (pingInterval) clearInterval(pingInterval);
         
-        setTimeout(connectWebSocket(roomId), reconnectDelay);
+        // FIX: Wrap in an anonymous function so it doesn't evaluate immediately
+        setTimeout(() => connectWebSocket(roomId), reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
     };
 }

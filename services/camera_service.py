@@ -124,7 +124,8 @@ class VisionService:
             if roi_crop.size > 0:
                 self.baselines[seat] = cv2.mean(roi_crop)[0]
                 
-        self.outbound_queue.put_nowait(Event(type="UPDATE_STATUS", payload={"text": "✅ Ambient Lighting Re-zeroed!"}))
+        # FIX: Send a dict instead of an Event object so it is JSON serializable
+        self.outbound_queue.put_nowait({"type": "UPDATE_STATUS", "payload": {"text": "✅ Ambient Lighting Re-zeroed!"}})
 
     async def _publish_buzz(self, team_name: str, player_name: str, trigger_time: float):
         self.buzz_lockout_until = trigger_time + 3.0

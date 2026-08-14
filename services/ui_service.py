@@ -144,21 +144,6 @@ async def get_index():
     with open("index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
-@app.get("/video_feed")
-async def video_feed():
-    """Streams MJPEG frames to the frontend for calibration."""
-    ui_service = app.state.ui_service
-    async def frame_generator():
-        while True:
-            if hasattr(ui_service, 'vision_service') and ui_service.vision_service:
-                frame_bytes = ui_service.vision_service.get_mjpeg_frame()
-                if frame_bytes:
-                    yield (b'--frame\r\n'
-                           b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-            await asyncio.sleep(0.1) 
-            
-    return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
-
 @app.websocket("/ws")
 async def root_websocket_endpoint(websocket: WebSocket):
     ui_service: HTMLGUIService = app.state.ui_service
