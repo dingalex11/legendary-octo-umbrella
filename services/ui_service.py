@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from core.events import Event
 import uvicorn
-
+import os
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
