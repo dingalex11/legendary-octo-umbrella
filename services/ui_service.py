@@ -1,32 +1,24 @@
-import asyncio
+import os
+import sys
 import json
+import asyncio
+from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from core.events import Event
-import uvicorn
-import os
-
-import os
-import asyncio
-import json
-from typing import Dict, List
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-import sys
-import os
+import uvicorn
+
+from core.events import Event
 
 # 1. Get the absolute path of the current subfolder
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
 # 2. Go up one level to the root project directory
 parent_dir = os.path.dirname(current_dir)
-
 # 3. Add the root directory to Python's system path
 sys.path.append(parent_dir)
 
-# 4. NOW you can safely import from main!
-# Adjust the import based on where your moderator class lives
+# 4. Import the moderator class safely
 from main import ScienceBowlModerator 
 
 app = FastAPI()
@@ -38,6 +30,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 class RoomManager:
     """Manages WebSocket connections with room support"""
@@ -67,22 +61,19 @@ class RoomManager:
     async def listen_for_outbound(self, room_id: str, moderator: ScienceBowlModerator):
         """Constantly reads the moderator's outbound queue and broadcasts it."""
         while True:
-            # Wait for the game engine to generate a payload (e.g., score update)
             message = await moderator.outbound_queue.get()
             await self.broadcast_to_room(room_id, message)
 
     async def connect(self, websocket: WebSocket, room_id: str):
         await websocket.accept()
         self.get_or_create_room(room_id)
-        self.active_connections[room_id].append(websocket)
+        if websocket not in self.active_connections[room_id]:
+            self.active_connections[room_id].append(websocket)
 
     def disconnect(self, websocket: WebSocket, room_id: str):
         if room_id in self.active_connections:
-            self.active_connections[room_id].remove(websocket)
-            # Optional cleanup: Delete the room from RAM if everyone leaves
-            # if not self.active_connections[room_id]:
-            #     del self.rooms[room_id]
-            #     del self.active_connections[room_id]
+            if websocket in self.active_connections[room_id]:
+                self.active_connections[room_id].remove(websocket)
 
     async def broadcast_to_room(self, room_id: str, message: dict):
         if room_id in self.active_connections:
@@ -90,30 +81,9 @@ class RoomManager:
                 try:
                     await connection.send_text(json.dumps(message))
                 except RuntimeError:
-                    # Safely ignore disconnected clients
                     pass
 
 manager = RoomManager()
-
-app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.get("/video_feed")
-async def video_feed():
-    """Streams MJPEG frames to the frontend for calibration."""
-    ui_service = app.state.ui_service
-    async def frame_generator():
-        while True:
-            # Safely grab the frame from VisionService
-            if hasattr(ui_service, 'vision_service') and ui_service.vision_service:
-                frame_bytes = ui_service.vision_service.get_mjpeg_frame()
-                if frame_bytes:
-                    yield (b'--frame\r\n'
-                           b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-            # Throttle stream to ~10 FPS to save network/browser rendering CPU
-            await asyncio.sleep(0.1) 
-            
-    return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 class HTMLGUIService:
     def __init__(self, inbound_queue: asyncio.Queue, outbound_queue: asyncio.Queue, vision_service=None):
@@ -125,13 +95,14 @@ class HTMLGUIService:
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
-        print("\n🌐 [UI SERVICE]: Browser connected to WebSocket!")
+        if websocket not in self.active_connections:
+            self.active_connections.append(websocket)
+        print("\n🌐 [UI SERVICE]: Browser connected to legacy root WebSocket!")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-        print("\n🌐 [UI SERVICE]: Browser disconnected.")
+        print("\n🌐 [UI SERVICE]: Browser disconnected from root.")
 
     async def broadcast(self, message: dict):
         for connection in self.active_connections:
@@ -139,8 +110,6 @@ class HTMLGUIService:
                 await connection.send_json(message)
             except RuntimeError:
                 continue
-
-    import os
 
     async def start_server(self):
         port = int(os.environ.get("PORT", 8080))
@@ -162,6 +131,7 @@ class HTMLGUIService:
             except asyncio.CancelledError:
                 break
 
+
 # --- FastAPI Routes ---
 
 @app.get("/")
@@ -169,8 +139,23 @@ async def get_index():
     with open("index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
+@app.get("/video_feed")
+async def video_feed():
+    """Streams MJPEG frames to the frontend for calibration."""
+    ui_service = app.state.ui_service
+    async def frame_generator():
+        while True:
+            if hasattr(ui_service, 'vision_service') and ui_service.vision_service:
+                frame_bytes = ui_service.vision_service.get_mjpeg_frame()
+                if frame_bytes:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            await asyncio.sleep(0.1) 
+            
+    return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
+
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def root_websocket_endpoint(websocket: WebSocket):
     ui_service: HTMLGUIService = app.state.ui_service
     await ui_service.connect(websocket)
     
@@ -178,11 +163,8 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
-            
-            # ROUTE EVERYTHING DIRECTLY TO MEMORY
             ui_service.inbound_queue.put_nowait(Event(type=message["type"], payload=message.get("payload", {})))
             
-            # Send immediate feedback for calibration without touching the disk
             if message["type"] == "SAVE_CALIBRATION":
                 await ui_service.outbound_queue.put({"type": "UPDATE_STATUS", "payload": {"text": "✅ Session ROIs Locked in Memory!"}})
                 
@@ -190,18 +172,20 @@ async def websocket_endpoint(websocket: WebSocket):
         ui_service.disconnect(websocket)
 
 @app.websocket("/ws/{room_id}")
-async def websocket_endpoint(websocket: WebSocket, room_id: str):
+async def room_websocket_endpoint(websocket: WebSocket, room_id: str):
     await manager.connect(websocket, room_id)
     moderator = manager.get_or_create_room(room_id)
     
     try:
         while True:
-            # 1. Receive data from a client in this room
             data = await websocket.receive_text()
             payload = json.loads(data)
             
-            # 2. Feed it into this specific room's game engine
-            await moderator.inbound_queue.put(payload)
+            # Support both dict messages and standard Event objects
+            event_type = payload.get("type", "UNKNOWN")
+            event_payload = payload.get("payload", {})
+            
+            await moderator.inbound_queue.put(Event(type=event_type, payload=event_payload))
             
     except WebSocketDisconnect:
         manager.disconnect(websocket, room_id)
