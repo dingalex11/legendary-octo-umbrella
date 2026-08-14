@@ -44,11 +44,11 @@ class RoomManager:
     # ✅ Wrap return type hint in quotes
     def get_or_create_room(self, room_id: str) -> 'ScienceBowlModerator':
         if room_id not in self.rooms:
-            # ✅ Add the import locally here to break the cycle!
             from main import ScienceBowlModerator 
             
-            # Initialize a fresh, isolated game engine for this new room
-            moderator = ScienceBowlModerator()
+            # FIX: Explicitly turn ON the camera and audio for all dynamic rooms!
+            moderator = ScienceBowlModerator(use_camera=True, use_audio=True)
+            
             self.rooms[room_id] = moderator
             self.active_connections[room_id] = []
             
@@ -58,7 +58,7 @@ class RoomManager:
             # Start the background task to route outbound messages to room clients
             asyncio.create_task(self.listen_for_outbound(room_id, moderator))
             
-            print(f"🚀 Room created: {room_id}")
+            print(f"🚀 Room created: {room_id} (Camera: ON, Audio: ON)")
             
         return self.rooms[room_id]
 

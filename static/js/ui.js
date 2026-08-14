@@ -157,6 +157,9 @@ function joinRoom() {
     if (input && input.value.trim() !== '') {
         currentRoomId = input.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
         
+        // FIX: Update the browser URL without refreshing the page
+        window.history.pushState({room: currentRoomId}, "", `?room=${currentRoomId}`);
+        
         // Hide Lobby, Show Landing
         const lobbyView = document.getElementById('view-lobby');
         const landingView = document.getElementById('view-landing');
@@ -256,3 +259,19 @@ function togglePause() {
     
     sendEvent('PAUSE_MATCH', { paused: isMatchPaused }); 
 }
+
+// --- AUTO-JOIN FROM URL ---
+window.addEventListener('DOMContentLoaded', () => {
+    // Look at the URL for "?room=something"
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get('room');
+    
+    if (roomParam) {
+        // Automatically fill the input box and click the join button behind the scenes
+        const input = document.getElementById('room-id-input');
+        if (input) {
+            input.value = roomParam;
+            joinRoom();
+        }
+    }
+});
