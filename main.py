@@ -578,8 +578,8 @@ class ScienceBowlModerator:
                         if action_type == "FORCE_JUDGMENT" and action.payload.get("correct"):
                             # REWIND STATE: Refund the -4, award +4, change to correct, and jump to bonus
                             self.state.apply_tossup_points(True)
-                            if team == "Team A": self.state.team_a_score += 8
-                            else: self.state.team_b_score += 8
+                            if team == "Team A": self.state.team_a_score += 4
+                            else: self.state.team_b_score += 4
                             
                             self.match_log[-1].update({"Correct": True, "Points": 4, "Score_A": self.state.team_a_score, "Score_B": self.state.team_b_score, "Edited": True})
                             await self.outbound_queue.put({"type": "NEW_LOG_ENTRY", "payload": self.match_log[-1]})
