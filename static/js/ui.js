@@ -151,16 +151,14 @@ if (bankFileInput) {
 }
 let currentRoomId = null;
 
-function joinRoom() {
+async function joinRoom() {
     const input = document.getElementById('room-id-input');
     
     if (input && input.value.trim() !== '') {
         currentRoomId = input.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
         
-        // FIX: Update the browser URL without refreshing the page
         window.history.pushState({room: currentRoomId}, "", `?room=${currentRoomId}`);
         
-        // Hide Lobby, Show Landing
         const lobbyView = document.getElementById('view-lobby');
         const landingView = document.getElementById('view-landing');
         if (lobbyView) {
@@ -172,8 +170,13 @@ function joinRoom() {
             landingView.classList.add('flex');
         }
         
-        // Boot up the WebSocket specific to this room
-        connectWebSocket(currentRoomId);
+        // Fetch the user's cloud API key before connecting
+        let apiKey = null;
+        if (window.getUserApiKey) {
+            apiKey = await window.getUserApiKey();
+        }
+        
+        connectWebSocket(currentRoomId, apiKey);
     } else {
         alert("⚠️ Please enter a valid room code.");
     }
@@ -275,3 +278,28 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+// ... [Existing ui.js code] ...
+
+const btnLoadCloudPacket = document.getElementById('btn-load-cloud-packet');
+const cloudPacketSelect = document.getElementById('cloud-packet-select');
+
+if (btnLoadCloudPacket) {
+    btnLoadCloudPacket.addEventListener('click', () => {
+        const selectedId = cloudPacketSelect?.value;
+        if (!selectedId || !window.cloudPacketsCache || !window.cloudPacketsCache[selectedId]) {
+            alert("⚠️ Please select a valid cloud packet first.");
+            return;
+        }
+
+        const bankJson = window.cloudPacketsCache[selectedId];
+        const bankName = cloudPacketSelect.options[cloudPacketSelect.selectedIndex].text;
+        
+        if (bankFileName) {
+            bankFileName.innerText = `✅ Loaded ${bankName} from Cloud. Game reset!`;
+            bankFileName.className = "text-xs text-teamA font-mono font-bold";
+        }
+
+        // Emit to backend exactly like a local file
+        sendEvent('LOAD_BANK', { bank: bankJson });
+    });
+}

@@ -166,3 +166,67 @@ function renderAnalyticsTables() {
         if(playerStatsBody) playerStatsBody.appendChild(tr);
     });
 }
+// ... [Existing analytics.js code] ...
+
+const btnCloudAnalytics = document.getElementById('btn-cloud-analytics');
+
+if (btnCloudAnalytics) {
+    btnCloudAnalytics.addEventListener('click', async () => {
+        if (!window.loadMatchLogsFromCloud) return;
+        
+        if (csvStatusText) {
+            csvStatusText.innerText = "FETCHING CLOUD LOGS...";
+            csvStatusText.className = "text-xs font-mono mt-1 block uppercase text-amber-500 font-bold";
+        }
+        
+        try {
+            const logs = await window.loadMatchLogsFromCloud();
+            
+            if (logs.length === 0) {
+                alert("No match logs found in your cloud profile.");
+                resetAnalytics();
+                return;
+            }
+            
+            // Standard CSV Headers expected by your processCSVData function
+            const headers = ["Q_Num", "Event_Type", "Team", "Player", "Correct", "Points", "Buzzpoint", "Buzz_Time", "Score_A", "Score_B"];
+            
+            logs.forEach(cloudDoc => {
+                const fileName = `cloud_${cloudDoc.roomId}_${cloudDoc.updatedAt}.csv`;
+                let csvContent = headers.join(",") + "\n";
+                
+                // Convert the JSON payload array back to a raw CSV string
+                cloudDoc.log.forEach(row => {
+                    const values = headers.map(h => {
+                        let val = row[h] !== undefined ? row[h] : "";
+                        // Wrap in quotes to prevent internal commas from breaking the parser
+                        return `"${val}"`; 
+                    });
+                    csvContent += values.join(",") + "\n";
+                });
+                
+                // Feed the generated CSV string directly into your existing parser!
+                processCSVData(csvContent, fileName);
+            });
+            
+            renderAnalyticsTables();
+            
+            if (csvCountBadge) {
+                csvCountBadge.style.display = "block";
+                csvCountBadge.innerText = `${gamesProcessed.size} GAMES PROCESSED`;
+            }
+            if (csvStatusText) {
+                csvStatusText.innerText = "CLOUD ANALYTICS COMPILED SUCCESSFULLY";
+                csvStatusText.className = "text-xs font-mono mt-1 block uppercase text-teamA font-bold";
+            }
+            
+        } catch (err) {
+            console.error("Error loading cloud analytics:", err);
+            if (csvStatusText) {
+                csvStatusText.innerText = "ERROR FETCHING CLOUD LOGS";
+                csvStatusText.className = "text-xs font-mono mt-1 block uppercase text-red-500 font-bold";
+            }
+            alert("Failed to load cloud logs. Check console for details.");
+        }
+    });
+}

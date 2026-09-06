@@ -32,11 +32,7 @@ class ScienceBowlModerator:
         if not self.use_audio:
             print("🔇 [AUDIO DISABLED]: Falling back to silent mock audio mode.")
             
-        try:
-            self.judge = JudgeService()
-        except Exception as e:
-            print(f"⚠️ [WARNING]: Judge Service failed to initialize: {e}")
-            self.judge = None
+        self.judge = None
 
         self.state = StateEngine() 
         
@@ -82,8 +78,16 @@ class ScienceBowlModerator:
         
     async def process_admin_event(self, event):
         evt_type = event.type.name if hasattr(event.type, 'name') else str(event.type)
+        if evt_type == "AUTH_INIT":
+            api_key = event.payload.get("api_key")
+            if api_key:
+                try:
+                    self.judge = JudgeService(api_key=api_key)
+                    await self.outbound_queue.put({"type": "UPDATE_STATUS", "payload": {"text": "✅ Cloud API Key Linked & AI Judge Online!"}})
+                except Exception as e:
+                    print(f"⚠️ [WARNING]: Judge Service failed to initialize: {e}")
 
-        if evt_type == "SAVE_ROSTER":
+        elif evt_type == "SAVE_ROSTER":
             self.custom_teams = event.payload.get("teams", {})
             self.custom_roster = event.payload.get("players", {})
             await self.outbound_queue.put({"type": "UPDATE_STATUS", "payload": {"text": "✅ Match Roster Locked In!"}})
@@ -209,7 +213,7 @@ class ScienceBowlModerator:
             # 4. Re-broadcast the entire log to visually update the UI table
             for entry in self.match_log:
                 await self.outbound_queue.put({"type": "NEW_LOG_ENTRY", "payload": entry})
-                
+            await self.outbound_queue.put({"type": "SYNC_LOG", "payload": {"log": self.match_log}})
             await self.outbound_queue.put({"type": "UPDATE_STATUS", "payload": {"text": "✏️ Scoresheet edited & recalculated."}})
 
         elif evt_type == "PROCESS_FRAME" and self.use_camera:
@@ -233,7 +237,7 @@ class ScienceBowlModerator:
             expected_event_types = [expected_event_types]
             
         # NEW: Added LOAD_BANK, SAVE_ROSTER, and EDIT_LOG_ENTRY to prevent them from being ignored
-        admin_events = ["EXPORT_CSV", "SAVE_CALIBRATION", "RESET_CALIBRATION", "CALIBRATE_BASELINE", "PROCESS_FRAME", "PING", "UPDATE_STATUS", "PAUSE_MATCH", "ADJUST_SCORE", "EDIT_LOG_ENTRY", "FORCE_ACCEPT", "LOAD_BANK", "SAVE_ROSTER"]
+        admin_events = ["EXPORT_CSV", "SAVE_CALIBRATION", "RESET_CALIBRATION", "CALIBRATE_BASELINE", "PROCESS_FRAME", "PING", "UPDATE_STATUS", "PAUSE_MATCH", "ADJUST_SCORE", "EDIT_LOG_ENTRY", "FORCE_ACCEPT", "LOAD_BANK", "SAVE_ROSTER", "AUTH_INIT"]
         
         while True:
             event = await self.inbound_queue.get()
@@ -815,6 +819,7 @@ class ScienceBowlModerator:
                     
                 self.state.next_question() 
                 self.current_q_idx += 1
+                await self.outbound_queue.put({"type": "SYNC_LOG", "payload": {"log": self.match_log}})
                 await asyncio.sleep(2)
 
         except asyncio.CancelledError:

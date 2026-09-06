@@ -5,17 +5,18 @@ import base64
 from openai import AsyncOpenAI
 
 class JudgeService:
-    def __init__(self):
-        # Grabs your GROQ_API_KEY from .env and routes to Groq servers
-        api_key = os.getenv("GROQ_API_KEY")
+    # Require api_key in the initializer
+    def __init__(self, api_key: str):
         if not api_key:
-            raise ValueError("[JUDGE ERROR]: GROQ_API_KEY is missing from your .env file!")
+            raise ValueError("[JUDGE ERROR]: API Key is missing!")
 
         self.client = AsyncOpenAI(
             api_key=api_key,
             base_url="https://api.groq.com/openai/v1"
         )
         print("[JUDGE AGENT]: Initialized online Groq AI Judge.")
+        
+    # ... KEEP ALL OTHER METHODS THE SAME ...
 
     async def transcribe_audio(self, b64_audio: str) -> str:
         """Sends raw audio bytes to Groq's Whisper API for transcription."""
@@ -32,12 +33,20 @@ class JudgeService:
             # Whisper API needs a tuple with a filename to determine the audio format.
             audio_file = ("audio.webm", audio_bytes, "audio/webm")
             
+            # System prompt to steer Whisper towards Science Bowl output rules
+            stt_prompt = (
+                "Science Bowl responses. Prioritize single letter answers: W, X, Y, Z. "
+                "Prioritize numerical answers and scientific terminology like "
+                "mitochondria, stoichiometry, vector, integer, thermodynamics."
+            )
+            
             response = await self.client.audio.transcriptions.create(
                 file=audio_file,
                 model="whisper-large-v3", # Groq's flagship STT model
                 response_format="json",
                 language="en",
-                temperature=0.0
+                temperature=0.0,
+                prompt=stt_prompt # Injected prompt context
             )
             
             transcript = response.text.strip()

@@ -1,38 +1,56 @@
-Moderator View
+# [SYSTEM_ROLE]
+You are a Senior Full-Stack Architect and UI/UX Engineer specializing in high-performance, real-time web applications. Your task is to refactor a "Science Bowl Match Engine" from a functional prototype into a production-ready, highly robust dashboard.
 
-The Moderator View will be the private "control center" where the human reader manages the game.Here is a comprehensive blueprint for structuring the Moderator View:
+# [PROJECT_CONTEXT]
+The application is a real-time multiplayer buzzer system that uses WebSockets for state synchronization and Groq's Whisper API for speech-to-text (STT) answer validation. 
+* Backend: Python, FastAPI, WebSockets, Pydantic, Python `logging`.
+* Frontend: React, Tailwind CSS, TypeScript.
+* Audio: base64 encoded audio sent to Whisper API for transcription.
 
-I. Access & Architecture (The Routing)
-    We don't want the moderator UI mixed up with the projector UI. We have two options for access:
-        The URL Parameter (Recommended): We can use a URL query like http://localhost:8080/?room=room_a&role=mod. In your ui.js, if role=mod is detected, we hide the standard <div id="view-match"> and instead unhide a brand new <div id="view-moderator">.  
+# [DESIGN_SYSTEM_REQUIREMENTS]
+UTILIZE THE SAME STYLE AS THE CURRENT FILE
 
-        The Standalone Page: Create a completely separate moderator.html file to keep the DOM clean and prevent accidental screen-sharing of the answers.
+# [ARCHITECTURAL_REQUIREMENTS]
+The application must support four distinct operational modes, dynamically spawned via a Room Factory pattern:
+1. `[ONLINE_PRACTICE]`: Virtual buzzers over WebSockets. Requires NTP-style latency synchronization for fair lockouts.
+2. `[IN_PERSON_PRACTICE]`: Bypasses network sync; relies on high-frequency local polling (USB buzzers/shared mic). Maximized UI text size for projector display.
+3. `[MODERATED_TOURNAMENT]`: Strict Role-Based Access Control (RBAC). The server ignores player state transitions until the Moderator client sends cryptographic authorization. Requires granular manual overrides.
+4. `[ISOLATION_DRILL]`: Solo single-player mode. Zero WebSockets. Client-side state authority. Uses Voice Activity Detection (VAD) to auto-trigger STT without manual clicks. Prefetches data in batches.
 
-II. Layout & Visual Hierarchy (The Wireframe)
-    A moderator needs to read quickly, monitor the AI's transcription, and intervene instantly. The layout should be split into three distinct zones:
+---
 
-    1. The Top Bar (Global Meta)
-        Room Code: Clearly displayed so they know they are in the right instance.
-        Match Clock & Play/Pause: A prominent timer with a massive Pause button.Live Scores: Team A vs. Team B totals.  
+# [EXECUTION_PLAN]
+We will execute this refactor strictly in the following sequential phases. Do not move to the next phase until I confirm the current phase is fully implemented and tested.
 
-    2. The Main Column (The "Teleprompter")
-        This is where our pdf_parser.js upgrades shine. This section needs large, highly readable typography.
-        Question Metadata: Category (e.g., BIOLOGY) and Type (Short Answer vs. Multiple Choice).
-        The Prompt: The actual question text.
-        The MC Grid (If Applicable): A 2x2 grid displaying the tossup_options or bonus_options arrays we extracted (W, X, Y, Z). This allows the moderator to easily read the choices aloud.  
-        The Official Answer: Highlighted in a neon color (e.g., Amber or Emerald) so it is impossible to miss.
-        AI Transcription Feed: A live-updating text box showing exactly what the Groq Whisper AI heard the student say (via the UPDATE_STATUS event).  
+## PHASE 1: [DATA_LAYER_RECONSTRUCTION]
+1. Replace all existing `print()` statements in the Python backend with standard `logging` (outputting timestamp, room ID, event type).
+2. Define rigorous Pydantic schemas for all WebSocket payloads (e.g., `BuzzPayload`, `OverridePayload`, `StateSyncPayload`, `SttResultPayload`).
+3. Implement a `RoomManagerFactory` in Python that spins up different state machine classes (`OnlineRoom`, `InPersonRoom`, `ModeratedRoom`, `SoloRoom`) based on the requested `RoomType` Enum.
 
-    3. The Right Sidebar (The Control Deck)This panel replaces your current "Moderator Control Bar" and centralizes all game state commands.  
-        Flow Controls: Giant buttons for START TOSSUP, RE-READ TOSSUP, and START BONUS.  
-        AI Overrides: If the AI Judge makes a mistake, the moderator needs big, immediate buttons for FORCE CORRECT and FORCE INCORRECT (triggering the FORCE_JUDGMENT event).  
-        Hardware Fallbacks: Buttons for FORCE BUZZ A and FORCE BUZZ B in case the computer vision / physical buzzers fail.  
-        Exception Handling: A CHALLENGE (SKIP) button to kill a dead or contested question.  
+## PHASE 2: [COMPONENT_DECONSTRUCTION]
+1. Strip all existing React components of their aesthetic "vibe" styling (remove rounded corners, shadows, transitions). Apply the Brutalist design tokens.
+2. Extract all state and network calls from core UI components, turning them into "dumb" components that only accept props.
+3. Standardize the following core UI components:
+   - `<PromptTerminal />`: Accepts `text`, `deliveryMode`, `highlightedTarget`.
+   - `<AudioActuator />`: Accepts `isRecording`, `onTrigger`.
+   - `<TelemetryMatrix />`: Accepts `playerData`, `latencyInfo`, `layoutMode`.
 
-III. Bottom Section (The Editable Scoresheet)
-    Just like your current match view, the bottom of the screen should feature the running log of the game.  
-        Live Table: A row for every question detailing the player, buzz point, and points awarded.
+## PHASE 3: [MODULE_ASSEMBLY]
+Assemble the "dumb" components into four distinct parent wrapper views:
+1. `<OnlinePracticeRoom />`: Includes the `<VirtualActuator />` (massive bottom-screen buzzer) and latency telemetry.
+2. `<InPersonPracticeRoom />`: Enlarges `<PromptTerminal />` to `text-5xl` and integrates the `<HardwareUplink />` audio visualizer.
+3. `<TournamentOverseerConsole />`: Builds a dense 3-column grid featuring `<TeamTelemetry />`, `<PayloadInspector />` (Whisper output), and `<BypassControls />` (manual overrides).
+4. `<IsolationDrillModule />`: Builds the solo view with a 2x2 `<IoToggleMatrix />` (Read/Listen, Type/Speak) and client-side performance analytics.
 
-        Inline Editing: By double-clicking a cell (which you've already stubbed out in websocket.js), the moderator can retroactively fix a score, triggering a full score recalculation across the board.  
+## PHASE 4: [I/O_AND_NETWORK_HOOKS]
+1. Implement the NTP-style latency sync logic for `[ONLINE_PRACTICE]`.
+2. Integrate a client-side Voice Activity Detection (VAD) library for `[ISOLATION_DRILL]` to trigger the STT automatically.
+3. Lock down the WebSocket router for `[MODERATED_TOURNAMENT]` with RBAC (rejecting unauthorized `[FORCE_CORRECT]` payloads).
+4. Inject the optimized prompt engineering into the Groq Whisper API call to prioritize single letters (W,X,Y,Z) and scientific terminology.
 
+## PHASE 5: [DEPLOYMENT_HARDENING]
+1. Generate a comprehensive `Dockerfile` and `docker-compose.yml` to containerize the FastAPI backend, OpenCV dependencies, and React frontend.
 
+---
+# [INITIAL_PROMPT_INSTRUCTION]
+Acknowledge these instructions and state your readiness. Then, begin executing **PHASE 1, Step 1 and Step 2** by providing the exact Python code for the `logging` configuration and the Pydantic schemas.

@@ -284,3 +284,52 @@ function copyJSON() {
             setTimeout(() => pdfCopyBtn.innerText = "Copy to Clipboard", 2000);
         });
 }
+const btnSaveCloud = document.getElementById('btn-save-cloud');
+
+// Override validateLiveJSON to also enable the Cloud button
+const originalValidate = validateLiveJSON;
+window.validateLiveJSON = function() {
+    originalValidate();
+    if (currentParsedData && !pdfOutputJSON.classList.contains('border-red-500')) {
+        btnSaveCloud.disabled = false;
+    } else {
+        btnSaveCloud.disabled = true;
+    }
+};
+// Re-bind the event listener if you override it
+if (pdfOutputJSON) {
+    pdfOutputJSON.removeEventListener('input', originalValidate);
+    pdfOutputJSON.addEventListener('input', window.validateLiveJSON);
+}
+
+// Handle Cloud Save Click
+if (btnSaveCloud) {
+    btnSaveCloud.addEventListener('click', async () => {
+        if (!currentParsedData) return;
+        
+        try {
+            const originalText = btnSaveCloud.innerText;
+            btnSaveCloud.innerText = "Saving...";
+            btnSaveCloud.disabled = true;
+            
+            await window.savePacketToCloud(`${currentPdfFileName}_bank`, currentParsedData);
+            
+            btnSaveCloud.innerText = "✅ Saved to Cloud!";
+            btnSaveCloud.classList.replace('bg-emerald-600', 'bg-teal-600');
+            
+            // Refresh the setup dropdown
+            if (window.populateCloudPackets) await window.populateCloudPackets();
+            
+            setTimeout(() => {
+                btnSaveCloud.innerText = originalText;
+                btnSaveCloud.disabled = false;
+                btnSaveCloud.classList.replace('bg-teal-600', 'bg-emerald-600');
+            }, 3000);
+            
+        } catch (err) {
+            alert(err.message);
+            btnSaveCloud.innerText = "Save to Cloud";
+            btnSaveCloud.disabled = false;
+        }
+    });
+}

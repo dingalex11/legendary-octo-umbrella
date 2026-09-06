@@ -78,8 +78,8 @@ document.addEventListener('click', () => {
 }, { once: true });
 
 // --- MAIN WEBSOCKET CONNECTION ---
-function connectWebSocket(roomId) {
-    // 1. Connect to the dynamic room endpoint
+// Update the signature to accept apiKey
+function connectWebSocket(roomId, apiKey = null) {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/${roomId}`);
 
@@ -89,6 +89,11 @@ function connectWebSocket(roomId) {
         
         reconnectDelay = 2000; 
         
+        // --- NEW: Send the API key payload immediately upon connection ---
+        if (apiKey) {
+            ws.send(JSON.stringify({ type: "AUTH_INIT", payload: { api_key: apiKey } }));
+        }
+        
         if (pingInterval) clearInterval(pingInterval);
         pingInterval = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
@@ -96,6 +101,8 @@ function connectWebSocket(roomId) {
             }
         }, 15000);
     };
+    
+    // ... KEEP THE REST OF YOUR ws.onmessage AND ws.onclose THE SAME ...
 
     // ... Keep the rest of your ws.onmessage and ws.onclose exactly the same ...
     // BUT update the reconnect logic inside ws.onclose to pass the roomId again:
@@ -117,6 +124,14 @@ function connectWebSocket(roomId) {
                 const label = document.getElementById('action-timer-label');
                 if (label) label.innerText = "TOSSUP (5s BUZZ)";
                 startActionTimer(5.0, null);
+            }
+        }
+        // ... [Existing websocket.js handlers like NEW_LOG_ENTRY] ...
+        
+        else if (data.type === 'SYNC_LOG') {
+            // Push the full array of JSON log entries to Firestore
+            if (window.saveMatchLogToCloud && typeof currentRoomId !== 'undefined') {
+                window.saveMatchLogToCloud(currentRoomId, payload.log);
             }
         }
         else if (data.type === 'UI_STATE') {
